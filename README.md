@@ -6,6 +6,8 @@ Le [Compose de déploiement](deployment/compose.yaml) rassemble les quatre appli
 
 Pour lancer l’accueil sur une machine de TP, publier temporairement le port de la passerelle sur la boucle locale.
 
+Si Drupal tourne déjà via `docker compose -f docker-compose-exercice1/docker-compose.yml up -d`, exécuter `export COMPOSE_PROJECT_NAME=docker-compose-exercice1` avant les commandes ci-dessous et garder le mot de passe PostgreSQL actuel. Adapter cette valeur si le lancement d’origine utilisait `-p` ou un autre `COMPOSE_PROJECT_NAME`. La passerelle réutilise ainsi les volumes PostgreSQL et Drupal du projet existant.
+
 ```sh
 export POSTGRES_PASSWORD=mot-de-passe-local-a-remplacer
 docker compose -f deployment/compose.yaml up -d --build react quiz flask drupal
