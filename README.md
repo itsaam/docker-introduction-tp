@@ -9,7 +9,7 @@ Pour lancer l’accueil sur une machine de TP, publier temporairement le port de
 ```sh
 export POSTGRES_PASSWORD=mot-de-passe-local-a-remplacer
 docker compose -f deployment/compose.yaml up -d --build react quiz flask drupal
-docker compose -f deployment/compose.yaml run --rm --no-deps -p 127.0.0.1:8090:80 gateway
+docker compose -f deployment/compose.yaml run --build --rm --no-deps -p 127.0.0.1:8090:80 gateway
 ```
 
 Ouvrir `http://localhost:8090`. Pour une installation Drupal neuve, renseigner le mot de passe ci-dessus dans l’assistant.
