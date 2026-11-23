@@ -1,0 +1,32 @@
+services:
+  drupal:
+    image: drupal:10-apache
+    ports:
+      - "127.0.0.1:8081:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - drupal_modules:/var/www/html/modules
+      - drupal_profiles:/var/www/html/profiles
+      - drupal_sites:/var/www/html/sites
+      - drupal_themes:/var/www/html/themes
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: drupal-tp-local
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  drupal_modules:
+  drupal_profiles:
+  drupal_sites:
+  drupal_themes:
+  postgres_data:
