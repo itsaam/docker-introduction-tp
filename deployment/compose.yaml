@@ -3,6 +3,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.gateway
+    labels:
+      - 'traefik.http.routers.${APP_NAME:-docker-lab}-edge.rule=Host(`${LAB_PUBLIC_HOST:-docker-lab.invalid}`) && ClientIP(`${LAB_TUNNEL_CIDR:-127.0.0.1/32}`) && HeaderRegexp(`CF-Visitor`, `https`)'
+      - 'traefik.http.routers.${APP_NAME:-docker-lab}-edge.entrypoints=web'
+      - 'traefik.http.routers.${APP_NAME:-docker-lab}-edge.priority=100'
+      - 'traefik.http.routers.${APP_NAME:-docker-lab}-edge.service=${APP_NAME:-docker-lab}-edge'
+      - 'traefik.http.services.${APP_NAME:-docker-lab}-edge.loadbalancer.server.port=80'
 
   react:
     build:

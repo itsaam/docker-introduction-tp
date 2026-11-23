@@ -4,6 +4,8 @@
 
 Le [Compose de déploiement](deployment/compose.yaml) rassemble les quatre applications sur une seule adresse. Nginx affiche le sélecteur et achemine les requêtes vers `/drupal/`, `/react/`, `/quiz/` et `/flask/`. Dans Dokploy, associer le domaine au service `gateway` sur son port interne `80` et définir `POSTGRES_PASSWORD` dans l’environnement du service Compose.
 
+Si un tunnel Cloudflare termine le HTTPS avant Traefik et transmet les requêtes à l’origine en HTTP, définir aussi `LAB_PUBLIC_HOST` avec le nom d’hôte public du TP et `LAB_TUNNEL_CIDR` avec le sous-réseau privé du connecteur.
+
 Pour lancer l’accueil sur une machine de TP, publier temporairement le port de la passerelle sur la boucle locale.
 
 Si Drupal tourne déjà via `docker compose -f docker-compose-exercice1/docker-compose.yml up -d`, exécuter `export COMPOSE_PROJECT_NAME=docker-compose-exercice1` avant les commandes ci-dessous et garder le mot de passe PostgreSQL actuel. Adapter cette valeur si le lancement d’origine utilisait `-p` ou un autre `COMPOSE_PROJECT_NAME`. La passerelle réutilise ainsi les volumes PostgreSQL et Drupal du projet existant.
