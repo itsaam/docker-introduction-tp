@@ -1,5 +1,19 @@
 # Introduction à Docker — corrigé
 
+## Accueil commun
+
+Le [Compose de déploiement](deployment/compose.yaml) rassemble les quatre applications sur une seule adresse. Nginx affiche le sélecteur et achemine les requêtes vers `/drupal/`, `/react/`, `/quiz/` et `/flask/`. Dans Dokploy, associer le domaine au service `gateway` sur son port interne `80` et définir `POSTGRES_PASSWORD` dans l’environnement du service Compose.
+
+Pour lancer l’accueil sur une machine de TP, publier temporairement le port de la passerelle sur la boucle locale.
+
+```sh
+export POSTGRES_PASSWORD=mot-de-passe-local-a-remplacer
+docker compose -f deployment/compose.yaml up -d --build react quiz flask drupal
+docker compose -f deployment/compose.yaml run --rm --no-deps -p 127.0.0.1:8090:80 gateway
+```
+
+Ouvrir `http://localhost:8090`. Pour une installation Drupal neuve, renseigner le mot de passe ci-dessus dans l’assistant.
+
 ## Images pour les trois applications
 
 Exécuter les commandes depuis la racine du dépôt, sur une machine de TP équipée de Docker.
