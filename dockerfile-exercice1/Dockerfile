@@ -6,6 +6,7 @@ COPY package.json package-lock.json ./
 COPY src/ ./src/
 COPY public/ ./public/
 
+ARG PUBLIC_URL
 RUN npm install \
     && npm install -g serve \
     && npm run build \

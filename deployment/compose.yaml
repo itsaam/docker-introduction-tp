@@ -1,0 +1,61 @@
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    labels:
+      - 'traefik.http.routers.${APP_NAME:-docker-lab}-edge.rule=Host(`${LAB_PUBLIC_HOST:-docker-lab.invalid}`) && ClientIP(`${LAB_TUNNEL_CIDR:-127.0.0.1/32}`) && HeaderRegexp(`CF-Visitor`, `https`)'
+      - 'traefik.http.routers.${APP_NAME:-docker-lab}-edge.entrypoints=web'
+      - 'traefik.http.routers.${APP_NAME:-docker-lab}-edge.priority=100'
+      - 'traefik.http.routers.${APP_NAME:-docker-lab}-edge.service=${APP_NAME:-docker-lab}-edge'
+      - 'traefik.http.services.${APP_NAME:-docker-lab}-edge.loadbalancer.server.port=80'
+
+  public-preview:
+    profiles: [public-preview]
+    image: cloudflare/cloudflared@sha256:4955524aeaa379e154023d5a027c250f7b35041a2e7e950cf13f144bc9b9c5ba
+    command: ["tunnel", "--no-autoupdate", "--protocol", "http2", "--url", "http://gateway:80"]
+    restart: unless-stopped
+    depends_on:
+      - gateway
+
+  react:
+    build:
+      context: ../dockerfile-exercice1
+      args:
+        PUBLIC_URL: /react
+
+  quiz:
+    build:
+      context: ../dockerfile-exercice2
+      args:
+        VITE_BASE: /quiz/
+
+  flask:
+    build: ../dockerfile-exercice3
+
+  drupal:
+    build:
+      context: .
+      dockerfile: Dockerfile.drupal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - drupal_modules:/var/www/html/modules
+      - drupal_profiles:/var/www/html/profiles
+      - drupal_sites:/var/www/html/sites
+      - drupal_themes:/var/www/html/themes
+
+  postgres:
+    extends:
+      file: ../docker-compose-exercice1/docker-compose.yml
+      service: postgres
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure POSTGRES_PASSWORD}
+
+volumes:
+  drupal_modules:
+  drupal_profiles:
+  drupal_sites:
+  drupal_themes:
+  postgres_data:

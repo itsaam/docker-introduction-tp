@@ -1,0 +1,3 @@
+FROM drupal:10-apache
+
+COPY drupal.conf /etc/apache2/conf-enabled/docker-lab.conf

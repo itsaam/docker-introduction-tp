@@ -7,7 +7,8 @@ RUN npm ci
 
 COPY index.html main.js questions_defaut.js style.css vite.config.js ./
 COPY public/ ./public/
-RUN npm run build
+ARG VITE_BASE=/
+RUN npm run build -- --base="$VITE_BASE"
 
 FROM nginx:alpine
 
