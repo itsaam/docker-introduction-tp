@@ -1,0 +1,19 @@
+services:
+  quiz-docker:
+    build:
+      context: .
+    image: quiz-docker:secure
+    ports:
+      - "127.0.0.1:${QUIZ_PORT:-8082}:8080"
+    restart: unless-stopped
+    user: "101:101"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    cpus: 0.5
+    mem_limit: 128m
+    pids_limit: 32

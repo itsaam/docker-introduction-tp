@@ -1,0 +1,15 @@
+FROM dhi.io/node:22.23.5-alpine3.23-dev AS build
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY index.html main.js questions_defaut.js style.css vite.config.js ./
+COPY public/ ./public/
+ARG VITE_BASE=/
+RUN npm run build -- --base="$VITE_BASE"
+
+FROM dhi.io/nginx:1.30.7-alpine3.24
+
+COPY --from=build /app/dist/ /usr/share/nginx/html/
+EXPOSE 8080
