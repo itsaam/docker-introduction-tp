@@ -64,7 +64,10 @@ jobs:
           trap 'docker stop course-build course-pulled >/dev/null 2>&1 || true' EXIT
           if ! docker pull "$VERSION" > pull.log 2>&1; then
             cat pull.log
-            grep -Eiq 'manifest unknown|name unknown' pull.log
+            if ! grep -Eiq 'manifest unknown|name unknown' pull.log &&
+               ! grep -Fxq "Error response from daemon: failed to resolve reference \"$VERSION\": $VERSION: not found" pull.log; then
+              exit 1
+            fi
             docker build --label "org.opencontainers.image.source=$SOURCE" --label "org.opencontainers.image.revision=$REVISION" -t "$VERSION" "$CONTEXT"
             smoke course-build
             docker push "$VERSION"
