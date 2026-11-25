@@ -43,14 +43,14 @@ Dans `-p 127.0.0.1:8088:3000`, `8088` est le port de la machine et `3000` celui 
 
 ### Construire, publier et retélécharger les images
 
-Le workflow [Publish course images](.github/workflows/publish-course-images.yml) construit les images du TP, les teste, les publie sur GitHub Container Registry puis supprime le tag local, télécharge l’image publiée et la teste une deuxième fois. Il joint ensuite les deux images à une [release GitHub](https://github.com/itsaam/docker-introduction-tp/releases/latest).
+[GitHub Actions](.github/workflows/publish-course-images.yml) publie et reteste les images sur GHCR. Les archives sont aussi dans la [release GitHub](https://github.com/itsaam/docker-introduction-tp/releases/latest).
 
 | Application | Image GHCR |
 | --- | --- |
 | React | `ghcr.io/itsaam/tp-docker-react:1.0` |
 | Quiz sécurisé | `ghcr.io/itsaam/quiz-docker:secure` |
 
-Le sujet cite Docker Hub. Ce rendu utilise GHCR comme registre de publication. Si un paquet GHCR est privé, télécharger son archive depuis la release publique et l’importer avec `docker load -i tp-docker-react.tar.gz` ou `docker load -i quiz-docker.tar.gz`. Les noms et les tags importés sont ceux du tableau.
+GHCR remplace Docker Hub pour le rendu. Pour une archive, utiliser `docker load -i NOM.tar.gz`.
 
 ## Drupal et PostgreSQL avec Compose
 

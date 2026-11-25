@@ -110,7 +110,8 @@ jobs:
               --notes 'Download and import the archives with docker load -i FILE.tar.gz.' --draft
           fi
           release_id=$(gh release view "$tag" --json databaseId --jq .databaseId)
-          gh api "repos/$GH_REPO/releases/$release_id/assets" --jq +            '.[] | select(.state == "uploaded" and .size > 0) | .name' > published-assets.txt
+          uploaded_filter='.[] | select(.state == "uploaded" and .size > 0) | .name'
+          gh api "repos/$GH_REPO/releases/$release_id/assets" --jq "$uploaded_filter" > published-assets.txt
           for image in quiz-docker.tar.gz tp-docker-react.tar.gz; do
             if ! grep -Fxq "$image" published-assets.txt; then
               gh release upload "$tag" "images/$image" --clobber

@@ -1,73 +1,42 @@
 # Audit du quiz Docker
 
-## Reproduire le relevé
-
-`Dockerfile.initial` conserve le Dockerfile du quiz avant cet exercice. Il construisait déjà le site avec Node et servait le résultat avec Nginx. La comparaison vise les images finales exécutées, sur la même architecture et avec la même base Grype.
-
 ```sh
 cd dockerfile-exercice2
 docker build -f Dockerfile.initial -t quiz-docker:initial .
-docker compose build quiz-docker
-docker image inspect quiz-docker:initial quiz-docker:secure \
-  --format '{{index .RepoTags 0}} {{.Os}}/{{.Architecture}} {{.Size}} {{json (index .Config "User")}}'
-docker image history --no-trunc quiz-docker:initial
-docker image history --no-trunc quiz-docker:secure
+docker build -t quiz-docker:secure .
+docker image inspect quiz-docker:initial quiz-docker:secure
+docker image history quiz-docker:initial
+docker image history quiz-docker:secure
+docker run --rm -p 127.0.0.1:8082:80 quiz-docker:initial
+# Puis arrêter ce conteneur et lancer : docker compose up -d
 grype db update
 GRYPE_DB_AUTO_UPDATE=false grype docker:quiz-docker:initial -o json > grype-initial.json
 GRYPE_DB_AUTO_UPDATE=false grype docker:quiz-docker:secure -o json > grype-secure.json
-docker run --rm -p 127.0.0.1:8082:80 quiz-docker:initial
-# Arrêter l'image initiale avant de tester Compose sur le même port.
-docker compose up -d
-docker compose ps
-docker compose down
 ```
 
-## Avant et après durcissement
+Relevé du 25/11/2026 sur amd64. Tailles Docker et correspondances Grype 0.121.1 avec la même base du 25/11 à 06:22 UTC.
 
-| Critère | Image initiale | Image sécurisée et Compose |
-| --- | --- | --- |
-| Base de compilation | `node:22-alpine`, tag mobile | Node 22 et Alpine avec version et digest |
-| Base d’exécution | `nginx:alpine`, tag mobile | Nginx 1.31.10 Alpine Slim avec digest |
-| Couches | Base Nginx et copie du site compilé | Base Nginx, configuration dédiée et copie du site compilé |
-| Node et npm en production | Absents | Absents |
-| Build en plusieurs étapes et copie sélective | Oui | Oui |
-| Contexte de build | Pas de `.dockerignore` | Secrets locaux, dépendances générées et fichiers de rendu exclus |
-| Privilèges Nginx | Le maître est lancé en root par défaut | Maître et workers sous UID/GID 101 |
-| Système de fichiers | Racine en écriture par défaut | Racine en lecture seule, écritures Nginx dans un tmpfs borné |
-| Capacités Linux et élévation de privilèges | Réglages Docker par défaut | Toutes les capacités retirées et `no-new-privileges` |
-| Ressources | Pas de limite spécifique | 0,5 CPU, 128 Mio, 32 PID |
-| Socket Docker | Aucun montage | Aucun montage |
-| Taille mesurée | 69 077 632 octets (65,88 Mio) | 18 944 838 octets (18,07 Mio) |
-| Critiques (correspondances Grype) | 1 | 1 |
-| Élevées | 10 | 10 |
-| Moyennes | 7 | 7 |
-| Faibles | 0 | 0 |
+| Image | Taille | UID | Critiques | Élevées | Moyennes | Faibles |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Quiz initial, Nginx Alpine | 102,3 Mo | 0 | 1 | 10 | 7 | 0 |
+| Quiz sécurisé, Nginx Alpine Slim | 29,4 Mo | 101 | 1 | 10 | 7 | 0 |
+| Quiz DHI, Nginx minimal | 14,8 Mo | 65532 | 0 | 10 | 4 | 0 |
+| Atelier Node, image officielle | 344,6 Mo | 0 | 1 | 79 | 76 | 12 |
+| Atelier Node, image DHI | 186,7 Mo | 1000 | 1 | 28 | 28 | 7 |
 
-Relevé du 25 novembre 2026 sur `linux/amd64` avec Grype 0.121.1 et la base construite à 06:22:21 UTC. Les totaux comptent les couples vulnérabilité–paquet. Par exemple, une même CVE repérée dans `libcrypto3` et `libssl3` compte deux fois. Les deux images ont les mêmes 18 correspondances dans BusyBox, OpenSSL et zlib. Ces résultats de scanner ne montrent pas quelle vulnérabilité est atteignable dans le quiz.
+Grype compte les couples CVE–paquet. Pour les deux premières images du quiz, les correspondances concernent BusyBox, OpenSSL et zlib. Sur l’atelier Node, il relève aussi 49 négligeables et 5 inconnues avant, contre 11 et 2 après.
 
-| Sévérité | Paquets | Identifiants relevés sur les deux images |
-| --- | --- | --- |
-| Critique | `zlib` | CVE-2026-4738 |
-| Élevée | `libcrypto3`, `libssl3` | CVE-2026-107493, CVE-2026-107494, CVE-2026-121482, CVE-2026-124709, CVE-2026-84786 |
-| Moyenne | `libcrypto3`, `libssl3` | CVE-2026-35190, CVE-2026-95690 |
-| Moyenne | `busybox`, `busybox-binsh`, `ssl_client` | CVE-2025-60876 |
+- Les deux Dockerfiles du quiz séparent déjà le build et l’exécution. À l’exécution, il suffit de Nginx et des fichiers compilés. La version Slim réduit la taille. Le Dockerfile fixe les versions, lance Nginx sans root et le `.dockerignore` exclut les fichiers locaux inutiles.
+- Compose impose une racine en lecture seule, retire les capacités, bloque l’élévation et limite CPU, mémoire et PID. Aucun des deux conteneurs ne monte le socket Docker. J’ai testé le démarrage, l’arrêt et une réponse au quiz dans Chromium, avec et sans la passerelle.
+- À refaire en production : reconstruire et rescanner après les correctifs, vérifier les dépendances du build et servir en HTTPS. Une image plus petite ou un scan moins chargé ne garantit pas l’absence de faille.
 
-Les fichiers compilés, Nginx et ses bibliothèques suffisent à l’exécution. La variante Alpine Slim réduit la taille d’environ 73 % par rapport à l’image initiale, qui était déjà multi-étape. Le Dockerfile définit la base, les fichiers copiés, l’utilisateur et la commande. Compose impose les limites, le montage temporaire et la politique de redémarrage. Le gain du durcissement vient notamment du retrait des capacités, de l’utilisateur non-root et de la racine en lecture seule.
+## DHI
 
-Le scan des images finales ne couvre pas tout le poste de compilation ni le moteur Docker. En production, il faut reconstruire avec les correctifs, rescanner périodiquement, examiner les dépendances de compilation et servir le trafic en HTTPS. Un résultat Grype dépend de sa base de vulnérabilités et de ce qu’il sait inventorier dans les images.
-
-## Variante Docker Hardened Images
-
-Le lien de l’énoncé renvoie une 404. Les étapes restent dans le [dépôt officiel de l’atelier Node](https://github.com/dockersamples/labspace-dhi-node/blob/main/labspace/04-switch-to-dhi.md). L’atelier compare Node 24 sur Debian slim à une compilation avec `dhi.io/node:24-debian13-dev` et une exécution avec `dhi.io/node:24-debian13`. Le registre exige une authentification, même avec les [images Community](https://docs.docker.com/dhi/how-to/use/).
-
-Le quiz est un site statique. Sa variante `Dockerfile.dhi` utilise le Node DHI de développement pour Vite et un Nginx DHI minimal pour servir `dist/`. Le Nginx DHI du catalogue fonctionne avec l’UID 65532 sur le port 8080 et sa variante d’exécution ne contient ni shell ni gestionnaire de paquets. L’image Nginx Alpine du quiz sécurisé conserve ceux de la distribution. Il faut mesurer taille et vulnérabilités sur l’image construite avant de conclure à un gain chiffré.
+J’ai repris le [TP Node officiel](https://github.com/dockersamples/labspace-dhi-node/blob/7059244/labspace/04-switch-to-dhi.md), compilé les deux images et vérifié la réponse `Hello World!`. Comparaison faite avec Grype. Pour le quiz, la variante DHI sert les mêmes fichiers avec un Nginx sans shell ni gestionnaire de paquets.
 
 ```sh
 docker login dhi.io
 docker build -f Dockerfile.dhi -t quiz-docker:dhi .
 docker run --rm -p 127.0.0.1:8083:8080 quiz-docker:dhi
-docker image inspect quiz-docker:dhi --format '{{.Size}} {{json (index .Config "User")}}'
-GRYPE_DB_AUTO_UPDATE=false grype docker:quiz-docker:dhi -o json > grype-dhi.json
+GRYPE_DB_AUTO_UPDATE=false grype docker:quiz-docker:dhi
 ```
-
-[Catalogue Nginx DHI](https://hub.docker.com/hardened-images/catalog/dhi/nginx/guides) · [Analyse des résultats Grype](https://oss.anchore.com/docs/guides/vulnerability/)

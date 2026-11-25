@@ -99,7 +99,7 @@ Reprendre la même commande `docker run`, attendre que `pg_isready` réussisse, 
 docker exec tp-postgres psql -U tpuser -d tpdb -c 'SELECT * FROM apprenants ORDER BY id;'
 ```
 
-Résultat attendu avant et après le remplacement
+Résultat vérifié avant et après le remplacement le 25 novembre 2026. Le nouveau conteneur avait un identifiant différent, utilisait le même volume nommé et a renvoyé exactement les trois mêmes lignes.
 
 | id | nom | formation |
 | --- | --- | --- |
