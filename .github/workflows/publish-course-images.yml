@@ -1,0 +1,123 @@
+name: Publish course images
+
+on:
+  workflow_dispatch:
+
+concurrency: publish-course-images
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: tp-docker-react
+            context: dockerfile-exercice1
+            port: 3000
+            tag: "1.0"
+          - name: quiz-docker
+            context: dockerfile-exercice2
+            port: 8080
+            tag: secure
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select image
+        id: target
+        env:
+          OWNER: ${{ github.repository_owner }}
+          IMAGE_NAME: ${{ matrix.name }}
+          IMAGE_TAG: ${{ matrix.tag }}
+        run: |
+          repository="ghcr.io/${OWNER,,}/$IMAGE_NAME"
+          printf 'image=%s:%s\nversion=%s:sha-%s\n' "$repository" "$IMAGE_TAG" "$repository" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build, publish and run the pulled image
+        env:
+          IMAGE: ${{ steps.target.outputs.image }}
+          VERSION: ${{ steps.target.outputs.version }}
+          IMAGE_NAME: ${{ matrix.name }}
+          CONTEXT: ${{ matrix.context }}
+          PORT: ${{ matrix.port }}
+          SOURCE: ${{ github.server_url }}/${{ github.repository }}
+          REVISION: ${{ github.sha }}
+        run: |
+          smoke() {
+            local name="$1" published
+            docker run -d --rm --name "$name" -p "127.0.0.1::${PORT}" "$VERSION"
+            published=$(docker port "$name" "${PORT}/tcp")
+            curl -fsS --retry 15 --retry-all-errors --retry-delay 1 --max-time 5 "http://$published/" >/dev/null
+            docker stop "$name"
+          }
+          trap 'docker stop course-build course-pulled >/dev/null 2>&1 || true' EXIT
+          if ! docker pull "$VERSION" > pull.log 2>&1; then
+            cat pull.log
+            grep -Eiq 'manifest unknown|name unknown' pull.log
+            docker build --label "org.opencontainers.image.source=$SOURCE" --label "org.opencontainers.image.revision=$REVISION" -t "$VERSION" "$CONTEXT"
+            smoke course-build
+            docker push "$VERSION"
+          fi
+          docker image rm "$VERSION"
+          docker pull "$VERSION"
+          docker image inspect --format '{{join .RepoDigests "\n"}}' "$VERSION"
+          smoke course-pulled
+          docker tag "$VERSION" "$IMAGE"
+          docker push "$IMAGE"
+          original=$(docker image inspect --format '{{.Id}}' "$IMAGE")
+          docker save "$IMAGE" | gzip -n > "$RUNNER_TEMP/$IMAGE_NAME.tar.gz"
+          docker image rm "$IMAGE" "$VERSION"
+          docker load -i "$RUNNER_TEMP/$IMAGE_NAME.tar.gz"
+          [[ "$(docker image inspect --format '{{.Id}}' "$IMAGE")" == "$original" ]]
+      - uses: actions/upload-artifact@v4
+        with:
+          name: course-image-${{ matrix.name }}
+          path: ${{ runner.temp }}/${{ matrix.name }}.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: course-image-*
+          merge-multiple: true
+          path: images
+      - name: Publish downloadable images
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag="tp-images-${GITHUB_SHA::12}"
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --target "$GITHUB_SHA" \
+              --title "Docker TP images (${GITHUB_SHA::12})" \
+              --notes 'Download and import the archives with docker load -i FILE.tar.gz.' --draft
+          fi
+          release_id=$(gh release view "$tag" --json databaseId --jq .databaseId)
+          uploaded_filter='.[] | select(.state == "uploaded" and .size > 0) | .name'
+          gh api "repos/$GH_REPO/releases/$release_id/assets" --jq "$uploaded_filter" > published-assets.txt
+          for image in quiz-docker.tar.gz tp-docker-react.tar.gz; do
+            if ! grep -Fxq "$image" published-assets.txt; then
+              gh release upload "$tag" "images/$image" --clobber
+            fi
+          done
+          is_draft=$(gh release view "$tag" --json isDraft --jq .isDraft)
+          if [[ "$is_draft" == true ]]; then
+            gh release edit "$tag" --draft=false
+          fi

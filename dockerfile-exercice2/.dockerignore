@@ -1,0 +1,11 @@
+.git
+.env
+.env.*
+.npmrc
+*.log
+node_modules
+dist
+docker-compose.yml
+Dockerfile*
+README.md
+AUDIT.md

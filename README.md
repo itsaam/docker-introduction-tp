@@ -1,8 +1,15 @@
 # Introduction à Docker — corrigé
 
+## Exercices du sujet
+
+- [Gestion des conteneurs et des réseaux](exercices/CONTAINERS-RESEAUX.md)
+- [Audit du quiz et comparaison DHI](dockerfile-exercice2/AUDIT.md)
+- [Compose autonome du quiz sécurisé](dockerfile-exercice2/README.md)
+- [Drupal avec PostgreSQL et exercice de persistance](#drupal-et-postgresql-avec-compose)
+
 ## Accueil commun
 
-Le [Compose de déploiement](deployment/compose.yaml) rassemble les quatre applications sur une seule adresse. Nginx affiche le sélecteur et achemine les requêtes vers `/drupal/`, `/react/`, `/quiz/` et `/flask/`. Dans Dokploy, définir `POSTGRES_PASSWORD` dans l’environnement du service Compose.
+Pour l’exercice Compose « application multi-conteneurs au choix », le [Compose de déploiement](deployment/compose.yaml) rassemble les quatre applications sur une seule adresse. Nginx affiche le sélecteur et achemine les requêtes vers `/drupal/`, `/react/`, `/quiz/` et `/flask/`. Dans Dokploy, définir `POSTGRES_PASSWORD` dans l’environnement du service Compose.
 
 Pour utiliser un domaine à toi, associe-le au service `gateway` sur le port interne `80`. Si un tunnel Cloudflare termine le HTTPS avant Traefik et transmet les requêtes à l’origine en HTTP, configure aussi `LAB_PUBLIC_HOST` avec le nom d’hôte public du TP et `LAB_TUNNEL_CIDR` avec le sous-réseau privé du connecteur.
 
@@ -29,27 +36,21 @@ Exécuter les commandes depuis la racine du dépôt, sur une machine de TP équi
 | Exercice | Construction | Démarrage | Adresse |
 | --- | --- | --- | --- |
 | [React](dockerfile-exercice1/Dockerfile) | `docker build -t tp-docker-react ./dockerfile-exercice1` | `docker run --rm -p 127.0.0.1:8088:3000 tp-docker-react` | `http://localhost:8088` |
-| [Quiz Vite](dockerfile-exercice2/Dockerfile) | `docker build -t tp-docker-quiz ./dockerfile-exercice2` | `docker run --rm -p 127.0.0.1:8082:80 tp-docker-quiz` | `http://localhost:8082` |
+| [Quiz Vite](dockerfile-exercice2/Dockerfile) | `docker build -t tp-docker-quiz ./dockerfile-exercice2` | `docker run --rm -p 127.0.0.1:8082:8080 tp-docker-quiz` | `http://localhost:8082` |
 | [Calculateur Flask](dockerfile-exercice3/Dockerfile) | `docker build -t tp-docker-flask ./dockerfile-exercice3` | `docker run --rm -p 127.0.0.1:8083:5000 tp-docker-flask` | `http://localhost:8083` |
 
 Dans `-p 127.0.0.1:8088:3000`, `8088` est le port de la machine et `3000` celui du conteneur. Le quiz est compilé avec Node.js, puis les fichiers générés sont servis par Nginx. Le calculateur Flask tourne avec Gunicorn. Pour vérifier les applications, ouvrir leurs pages, répondre à une question du quiz et soumettre le formulaire Flask.
 
-### Tester le téléchargement depuis Docker Hub
+### Construire, publier et retélécharger les images
 
-Remplacer `VOTRE_COMPTE` par son espace de noms Docker Hub. Arrêter le conteneur React lancé ci-dessus avec Ctrl+C avant de relancer le test sur le même port.
+[GitHub Actions](.github/workflows/publish-course-images.yml) publie et reteste les images sur GHCR. Les archives sont aussi dans la [release GitHub](https://github.com/itsaam/docker-introduction-tp/releases/latest).
 
-```sh
-docker login
-docker tag tp-docker-react VOTRE_COMPTE/tp-docker-react:1.0
-docker push VOTRE_COMPTE/tp-docker-react:1.0
-```
+| Application | Image GHCR |
+| --- | --- |
+| React | `ghcr.io/itsaam/tp-docker-react:1.0` |
+| Quiz sécurisé | `ghcr.io/itsaam/quiz-docker:secure` |
 
-Vérifier le tag `1.0` dans son dépôt Docker Hub. Retirer les deux tags locaux de l’image, puis relancer le conteneur depuis Docker Hub et rouvrir `http://localhost:8088`.
-
-```sh
-docker image rm tp-docker-react VOTRE_COMPTE/tp-docker-react:1.0
-docker run --rm -p 127.0.0.1:8088:3000 VOTRE_COMPTE/tp-docker-react:1.0
-```
+GHCR remplace Docker Hub pour le rendu. Pour une archive, utiliser `docker load -i NOM.tar.gz`.
 
 ## Drupal et PostgreSQL avec Compose
 
